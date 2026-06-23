@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="JoStock - نظام إدارة المخزون المتقدم لإدارة المستودعات والأقسام والأصناف">
+    <title>JoStock | نظام إدارة المخزون</title>
+
+    <!-- Google Fonts — Tajawal (Arabic) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap"
+        rel="stylesheet">
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- PWA & Mobile Web App Settings -->
+    <meta name="theme-color" content="#3b82f6" />
+    <meta name="msapplication-TileColor" content="#0f172a" />
+    <link rel="icon" type="image/webp" href="imgs/logo.webp" />
+    <link rel="apple-touch-icon" href="imgs/logo.webp" />
+    <link rel="manifest" href="manifest.json" />
+</head>
+
+<body>
+    <!-- ╔══════════════════════════════════════════════╗
+         ║               AUTH / LOGIN SCREEN            ║
+         ╚══════════════════════════════════════════════╝ -->
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-card">
+            <div class="login-header">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" width="48" height="48" style="color: var(--primary);">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <h2>JoStock</h2>
+                <p>تسجيل الدخول للنظام</p>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>رقم المستخدم (ID)</label>
+                    <input type="text" id="login-id" class="form-control" placeholder="أدخل رقمك" required autocomplete="username">
+                </div>
+                <div class="form-group" style="position: relative;">
+                    <label>كلمة المرور</label>
+                    <input type="password" id="login-password" class="form-control" placeholder="أدخل كلمة المرور" required autocomplete="current-password" style="padding-left: 40px;">
+                    <button type="button" id="toggle-password" class="btn-icon" style="position: absolute; left: 8px; top: 29px; color: var(--text-muted);" title="إظهار كلمة المرور">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="eye-icon">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                </div>
+                <button type="submit" id="btn-login" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;" disabled>جاري التحقق من الجلسة...</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║              HEADER / NAVBAR                 ║
+         ╚══════════════════════════════════════════════╝ -->
+    <header id="app-header" class="header">
+        <div class="header-inner">
+            <!-- Brand -->
+            <div class="header-brand">
+                <div class="logo-icon">
+                    <!-- Inline SVG — Warehouse/Box icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="28" height="28">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                        <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h1 class="brand-name">JoStock</h1>
+                    <span class="brand-subtitle">نظام إدارة المخزون</span>
+                </div>
+            </div>
+
+            <!-- Global Search -->
+            <div class="header-search">
+                <div class="search-wrapper">
+                    <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <input type="text" id="global-search" class="search-input"
+                        placeholder="بحث عن صنف في جميع المستودعات..." autocomplete="off">
+                    <kbd class="search-shortcut">Ctrl+K</kbd>
+                </div>
+                <!-- Live search results dropdown -->
+                <div id="search-results" class="search-results hidden"></div>
+            </div>
+
+            <!-- AUTH UPDATE: User Actions Header Menu -->
+            <div class="header-user-actions" style="display: flex; gap: 8px;">
+                <button id="btn-user-management" class="btn-icon hidden" title="إدارة المستخدمين" onclick="window.openUserManagementModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </button>
+                <button id="btn-change-password" class="btn-icon" title="تغيير كلمة المرور" onclick="window.openChangePasswordModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                    </svg>
+                </button>
+                <button id="btn-logout" class="btn-icon" title="تسجيل خروج">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║           DASHBOARD STATS WIDGETS            ║
+         ╚══════════════════════════════════════════════╝ -->
+    <section class="dashboard" id="dashboard">
+        <div class="stats-grid">
+            <!-- Warehouse Count -->
+            <div class="stat-card stat-warehouses" id="stat-card-warehouses">
+                <div class="stat-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="24" height="24">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                        <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-value" id="stat-warehouses">0</span>
+                    <span class="stat-label">مستودعات</span>
+                </div>
+                <div class="stat-accent"></div>
+            </div>
+
+            <!-- Sections Count -->
+            <div class="stat-card stat-sections" id="stat-card-sections">
+                <div class="stat-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="24" height="24">
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-value" id="stat-sections">0</span>
+                    <span class="stat-label">أقسام</span>
+                </div>
+                <div class="stat-accent"></div>
+            </div>
+
+            <!-- Items Count -->
+            <div class="stat-card stat-items" id="stat-card-items">
+                <div class="stat-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="24" height="24">
+                        <path
+                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                        <line x1="12" y1="22.08" x2="12" y2="12" />
+                    </svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-value" id="stat-items">0</span>
+                    <span class="stat-label">أصناف</span>
+                </div>
+                <div class="stat-accent"></div>
+            </div>
+
+            <!-- Low Stock Count -->
+            <div class="stat-card stat-low-stock" id="stat-card-low-stock">
+                <div class="stat-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="24" height="24">
+                        <path
+                            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-value" id="stat-low-stock">0</span>
+                    <span class="stat-label">نواقص</span>
+                </div>
+                <div class="stat-accent"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║           LOW STOCK ALERTS PANEL             ║
+         ╚══════════════════════════════════════════════╝ -->
+    <section id="low-stock-panel" class="low-stock-panel hidden">
+        <div class="panel-header">
+            <div class="panel-title">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" width="20" height="20">
+                    <path
+                        d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <h3>تنبيهات النواقص</h3>
+            </div>
+            <button id="btn-close-low-stock" class="btn-icon-close" title="إغلاق">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" width="18" height="18">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </button>
+        </div>
+        <div id="low-stock-list" class="low-stock-list">
+            <!-- Populated dynamically by JS -->
+        </div>
+    </section>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║          ACTION BAR (Filters + Buttons)      ║
+         ╚══════════════════════════════════════════════╝ -->
+    <section class="action-bar">
+        <div class="action-bar-inner">
+            <!-- Breadcrumb Navigation -->
+            <nav class="breadcrumb" id="breadcrumb">
+                <button class="crumb crumb-active" data-level="home">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="14" height="14">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    </svg>
+                    الرئيسية
+                </button>
+            </nav>
+
+            <!-- Filters + Actions -->
+            <div class="action-bar-controls">
+                <div class="filters">
+                    <div class="filter-group">
+                        <select id="warehouse-filter" class="filter-select">
+                            <option value="">كل المستودعات</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <select id="section-filter" class="filter-select" disabled>
+                            <option value="">كل الأقسام</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="btn-show-reports" class="btn btn-outline" title="عرض التقارير" onclick="window.showReportsView()">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <line x1="18" y1="20" x2="18" y2="10" />
+                            <line x1="12" y1="20" x2="12" y2="4" />
+                            <line x1="6" y1="20" x2="6" y2="14" />
+                        </svg>
+                        <span>التقارير</span>
+                    </button>
+                    <button id="btn-add-warehouse" class="btn btn-outline" title="إضافة مستودع">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" width="16" height="16">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        <span>مستودع</span>
+                    </button>
+                    <button id="btn-add-section" class="btn btn-outline" title="إضافة قسم">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" width="16" height="16">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        <span>قسم</span>
+                    </button>
+                    <button id="btn-add-item" class="btn btn-primary" title="إضافة صنف جديد">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" width="16" height="16">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        <span>صنف جديد</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║              MAIN CONTENT AREA               ║
+         ╚══════════════════════════════════════════════╝ -->
+    <main class="main-content" id="main-content">
+        <!-- Content Header -->
+        <div class="content-header" id="content-header">
+            <h2 id="content-title" class="content-title">المستودعات</h2>
+            <span id="content-count" class="content-count"></span>
+        </div>
+
+        <!-- View: Warehouses Grid -->
+        <div id="warehouses-view" class="cards-grid">
+            <!-- Populated dynamically -->
+        </div>
+
+        <!-- View: Sections Grid -->
+        <div id="sections-view" class="cards-grid hidden">
+            <!-- Populated dynamically -->
+        </div>
+
+        <!-- View: Items Grid -->
+        <div id="items-view" class="hidden">
+            <div id="items-grid" class="items-grid">
+                <!-- Cards injected via JS -->
+            </div>
+        </div>
+
+        <!-- View: Reports -->
+        <div id="reports-view" class="hidden">
+            <div class="reports-container">
+                <div class="cards-grid" id="reports-grid">
+                    <div class="nav-card">
+                        <div class="nav-card-header">
+                            <span class="nav-card-name">إجمالي الوارد</span>
+                        </div>
+                        <div class="nav-card-meta">
+                            <span class="nav-card-badge badge-in" id="report-total-in">0</span>
+                        </div>
+                    </div>
+                    <div class="nav-card">
+                        <div class="nav-card-header">
+                            <span class="nav-card-name">إجمالي الصادر</span>
+                        </div>
+                        <div class="nav-card-meta">
+                            <span class="nav-card-badge badge-out" id="report-total-out">0</span>
+                        </div>
+                    </div>
+                    <div class="nav-card">
+                        <div class="nav-card-header">
+                            <span class="nav-card-name">إجمالي الحركات (للنتيجة)</span>
+                        </div>
+                        <div class="nav-card-meta">
+                            <span class="nav-card-badge" id="report-total-items">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-wrapper" style="margin-top: 24px;">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>المستودع</th>
+                                <th>عدد الأقسام</th>
+                                <th>عدد الأصناف</th>
+                                <th>إجمالي الكميات (بالقطعة)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reports-table-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ═══════════════════════════════════════════════
+                     سجل الحركات الشامل (Global History Log)
+                     ═══════════════════════════════════════════════ -->
+                <div style="margin-top: 32px; padding: 20px; background: var(--bg-surface); border-radius: var(--radius-lg); border: 1px solid var(--border-light);">
+                    <h3 style="margin: 0 0 16px 0; font-size: 1.1rem; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        سجل الحركات الشامل
+                    </h3>
+
+                    <!-- Filters Toolbar -->
+                    <div class="history-filters" style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: flex-end; background: var(--bg-elevated); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+                        <div class="form-group" style="margin-bottom: 0; min-width: 130px;">
+                            <label style="font-size: 0.8rem; margin-bottom: 2px;">من تاريخ</label>
+                            <input type="date" id="gl-filter-from" class="form-control" style="padding: 6px; font-size: 0.9rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; min-width: 130px;">
+                            <label style="font-size: 0.8rem; margin-bottom: 2px;">إلى تاريخ</label>
+                            <input type="date" id="gl-filter-to" class="form-control" style="padding: 6px; font-size: 0.9rem;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; min-width: 140px;">
+                            <label style="font-size: 0.8rem; margin-bottom: 2px;">المستودع</label>
+                            <select id="gl-filter-wh" class="form-control" style="padding: 6px; font-size: 0.9rem;">
+                                <option value="">الكل</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; min-width: 140px;">
+                            <label style="font-size: 0.8rem; margin-bottom: 2px;">القسم</label>
+                            <select id="gl-filter-sec" class="form-control" style="padding: 6px; font-size: 0.9rem;" disabled>
+                                <option value="">الكل</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; min-width: 140px;">
+                            <label style="font-size: 0.8rem; margin-bottom: 2px;">الصنف</label>
+                            <select id="gl-filter-item" class="form-control" style="padding: 6px; font-size: 0.9rem;" disabled>
+                                <option value="">الكل</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 6px; align-self: flex-end;">
+                            <button type="button" class="btn btn-primary btn-sm" id="btn-gl-search" style="height: 34px;">
+                                <span class="btn-text">بحث</span>
+                                <div class="btn-loader hidden"></div>
+                            </button>
+                            <button type="button" class="btn btn-ghost btn-sm" id="btn-gl-reset" style="height: 34px;" title="إعادة ضبط الفلاتر">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <polyline points="1 4 1 10 7 10" />
+                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Results Count -->
+                    <div id="gl-results-info" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;" class="hidden"></div>
+
+                    <!-- Global History Table -->
+                    <div class="table-wrapper">
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>التاريخ</th>
+                                    <th>الوقت</th>
+                                    <th>المستودع</th>
+                                    <th>القسم</th>
+                                    <th>الصنف</th>
+                                    <th>النوع</th>
+                                    <th>الكمية</th>
+                                    <th>الرصيد بعد</th>
+                                    <th>ملاحظة</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gl-history-body">
+                                <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">اختر التاريخ واضغط "بحث" لعرض الحركات</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="gl-history-empty" class="empty-state-sm hidden">
+                        <p>لا توجد حركات في النطاق المحدد</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="empty-state hidden">
+            <div class="empty-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="1.5" width="64" height="64">
+                    <path
+                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                    <line x1="12" y1="22.08" x2="12" y2="12" />
+                </svg>
+            </div>
+            <p id="empty-text" class="empty-text">لا توجد بيانات لعرضها</p>
+            <p id="empty-sub" class="empty-sub">ابدأ بإضافة مستودع جديد</p>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="loading-spinner hidden">
+            <div class="spinner"></div>
+            <p>جاري التحميل...</p>
+        </div>
+    </main>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║       MODAL 1: ADD / EDIT WAREHOUSE          ║
+         ╚══════════════════════════════════════════════╝ -->
+    <div id="warehouse-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="wh-modal-title">إضافة مستودع</h3>
+                <button class="modal-close" data-close="warehouse-modal" aria-label="إغلاق">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <form id="warehouse-form" class="modal-body">
+                <input type="hidden" id="wh-edit-id">
+                <div class="form-group">
+                    <label for="wh-name">اسم المستودع <span class="required">*</span></label>
+                    <input type="text" id="wh-name" class="form-input" required
+                        placeholder="مثال: مستودع المواد الغذائية" maxlength="100">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" data-close="warehouse-modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" id="wh-submit-btn">
+                        <span class="btn-text">حفظ</span>
+                        <div class="btn-loader hidden"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║        MODAL 2: ADD / EDIT SECTION           ║
+         ╚══════════════════════════════════════════════╝ -->
+    <div id="section-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="sec-modal-title">إضافة قسم</h3>
+                <button class="modal-close" data-close="section-modal" aria-label="إغلاق">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <form id="section-form" class="modal-body">
+                <input type="hidden" id="sec-edit-id">
+                <input type="hidden" id="sec-edit-wh-id">
+                <div class="form-group">
+                    <label for="sec-warehouse-select">المستودع <span class="required">*</span></label>
+                    <select id="sec-warehouse-select" class="form-input" required>
+                        <option value="">اختر المستودع...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="sec-name">اسم القسم <span class="required">*</span></label>
+                    <input type="text" id="sec-name" class="form-input" required placeholder="مثال: قسم المشروبات"
+                        maxlength="100">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" data-close="section-modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" id="sec-submit-btn">
+                        <span class="btn-text">حفظ</span>
+                        <div class="btn-loader hidden"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║         MODAL 3: ADD / EDIT ITEM             ║
+         ╚══════════════════════════════════════════════╝ -->
+    <div id="item-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3 id="item-modal-title">إضافة صنف جديد</h3>
+                <button class="modal-close" data-close="item-modal" aria-label="إغلاق">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <form id="item-form" class="modal-body">
+                <input type="hidden" id="item-edit-id">
+                <input type="hidden" id="item-edit-wh-id">
+                <input type="hidden" id="item-edit-sec-id">
+
+                <!-- Row: Warehouse + Section selectors -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="item-warehouse-select">المستودع <span class="required">*</span></label>
+                        <select id="item-warehouse-select" class="form-input" required>
+                            <option value="">اختر المستودع...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="item-section-select">القسم <span class="required">*</span></label>
+                        <select id="item-section-select" class="form-input" required disabled>
+                            <option value="">اختر القسم...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Item Name -->
+                <div class="form-group">
+                    <label for="item-name">اسم الصنف <span class="required">*</span></label>
+                    <input type="text" id="item-name" class="form-input" required placeholder="مثال: عصير برتقال طبيعي"
+                        maxlength="150">
+                </div>
+
+                <!-- Row: Unit Type + Carton Capacity -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="item-unit">وحدة القياس <span class="required">*</span></label>
+                        <select id="item-unit" class="form-input" required>
+                            <option value="قطعة">قطعة</option>
+                            <option value="كيلو جرام">كيلو جرام</option>
+                            <option value="كرتونة">كرتونة</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="carton-cap-group" style="display: none;">
+                        <label for="item-carton-cap">عدد القطع في الكرتونة <span class="required">*</span></label>
+                        <input type="number" id="item-carton-cap" class="form-input" min="1" step="1"
+                            placeholder="مثال: 24">
+                    </div>
+                </div>
+
+                <!-- Row: Initial Stock + Min Stock -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="item-initial-stock">
+                            المخزون الحالي <span class="required">*</span>
+                            <small id="stock-unit-hint" class="unit-hint">(بالقطعة)</small>
+                        </label>
+                        <input type="number" id="item-initial-stock" class="form-input" min="0" step="any" required
+                            placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="item-min-stock">
+                            حد الطلب (الحد الأدنى) <span class="required">*</span>
+                            <small id="min-stock-unit-hint" class="unit-hint">(بالقطعة)</small>
+                        </label>
+                        <input type="number" id="item-min-stock" class="form-input" min="0" step="any" required
+                            placeholder="0">
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" data-close="item-modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" id="item-submit-btn">
+                        <span class="btn-text">حفظ</span>
+                        <div class="btn-loader hidden"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║       MODAL 4: STOCK IN / OUT (تحريك)       ║
+         ╚══════════════════════════════════════════════╝ -->
+    <div id="stock-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>تحريك مخزون</h3>
+                <button class="modal-close" data-close="stock-modal" aria-label="إغلاق">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <form id="stock-form" class="modal-body">
+                <!-- Hidden refs for the target item -->
+                <input type="hidden" id="stock-wh-id">
+                <input type="hidden" id="stock-sec-id">
+                <input type="hidden" id="stock-item-id">
+                <input type="hidden" id="stock-unit-type">
+                <input type="hidden" id="stock-carton-cap">
+
+                <!-- Item info display -->
+                <div class="stock-item-info">
+                    <div class="stock-info-row">
+                        <span class="stock-label">الصنف:</span>
+                        <span class="stock-value" id="stock-item-name">—</span>
+                    </div>
+                    <div class="stock-info-row">
+                        <span class="stock-label">المخزون الحالي:</span>
+                        <span class="stock-value stock-highlight" id="stock-item-current">—</span>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="stock-type">نوع الحركة <span class="required">*</span></label>
+                        <select id="stock-type" class="form-input" required>
+                            <option value="وارد">وارد (إضافة)</option>
+                            <option value="صادر">صادر (صرف)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="stock-qty">
+                            الكمية <span class="required">*</span>
+                            <small id="stock-qty-hint" class="unit-hint"></small>
+                        </label>
+                        <input type="number" id="stock-qty" class="form-input" min="0.001" step="any" required
+                            placeholder="0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="stock-note">ملاحظة (اختياري)</label>
+                    <input type="text" id="stock-note" class="form-input" placeholder="سبب الحركة..." maxlength="200">
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" data-close="stock-modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" id="stock-submit-btn">
+                        <span class="btn-text">تنفيذ</span>
+                        <div class="btn-loader hidden"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║   MODAL 5: ITEM HISTORY LOG (سجل الحركات)   ║
+         ╚══════════════════════════════════════════════╝ -->
+    <div id="history-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal modal-xl">
+            <div class="modal-header">
+                <h3>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="20" height="20" style="vertical-align: middle; margin-left: 6px;">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    سجل حركات الصنف
+                </h3>
+                <button class="modal-close" data-close="history-modal" aria-label="إغلاق">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Item info & Filters -->
+                <div class="history-filters" style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; background: var(--bg-surface); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+                    <div class="history-item-info" style="flex: 1; min-width: 200px;">
+                        <span class="history-item-label">الصنف:</span>
+                        <span id="history-item-name" class="history-item-name" style="font-weight: bold; color: var(--primary-light);">—</span>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.8rem; margin-bottom: 2px;">من تاريخ</label>
+                        <input type="date" id="history-filter-from" class="form-control" style="padding: 6px; font-size: 0.9rem;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.8rem; margin-bottom: 2px;">إلى تاريخ</label>
+                        <input type="date" id="history-filter-to" class="form-control" style="padding: 6px; font-size: 0.9rem;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; align-self: flex-end;">
+                        <button type="button" class="btn btn-primary btn-sm" id="btn-filter-history" style="height: 34px;">تصفية</button>
+                    </div>
+                </div>
+
+                <!-- History Table -->
+                <div class="table-wrapper">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>التاريخ</th>
+                                <th>الوقت</th>
+                                <th>النوع</th>
+                                <th>الكمية</th>
+                                <th>الرصيد بعد</th>
+                                <th>ملاحظة</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty history state -->
+                <div id="history-empty" class="empty-state-sm hidden">
+                    <p>لا توجد حركات مسجلة لهذا الصنف</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║      MODAL 6: CONFIRM DELETE DIALOG          ║
+         ╚══════════════════════════════════════════════╝ -->
+    <div id="confirm-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal modal-sm">
+            <div class="modal-header modal-header-danger">
+                <h3>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="20" height="20" style="vertical-align: middle; margin-left: 6px;">
+                        <path
+                            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    تأكيد الحذف
+                </h3>
+                <button class="modal-close" data-close="confirm-modal" aria-label="إغلاق">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message" class="confirm-message">هل أنت متأكد من الحذف؟</p>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" data-close="confirm-modal">إلغاء</button>
+                    <button type="button" id="btn-confirm-delete" class="btn btn-danger">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" width="16" height="16">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                        حذف
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║      MODAL 6.5: INTER-WAREHOUSE TRANSFER     ║
+         ╚══════════════════════════════════════════════╝ -->
+    <div id="transfer-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal modal-md">
+            <div class="modal-header">
+                <h3>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="20" height="20" style="vertical-align: middle; margin-left: 6px;">
+                        <path d="M17 3l4 4-4 4"></path>
+                        <path d="M3 7h18"></path>
+                        <path d="M7 21l-4-4 4-4"></path>
+                        <path d="M21 17H3"></path>
+                    </svg>
+                    نقل مخزون
+                </h3>
+                <button class="modal-close" data-close="transfer-modal" aria-label="إغلاق">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <form id="transfer-form">
+                <div class="modal-body">
+                    <input type="hidden" id="transfer-source-item-id">
+                    <input type="hidden" id="transfer-source-wh-id">
+                    <input type="hidden" id="transfer-source-sec-id">
+                    <input type="hidden" id="transfer-unit-type">
+                    <input type="hidden" id="transfer-carton-cap">
+
+                    <div class="stock-info-card" style="margin-bottom: 20px; padding: 15px; background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+                        <div style="font-weight: bold; margin-bottom: 5px;" id="transfer-item-name"></div>
+                        <div style="color: var(--text-secondary); font-size: 0.9rem;">الرصيد المتاح: <span id="transfer-item-current" style="color: var(--primary-light); font-weight: bold;"></span></div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="transfer-dest-wh">المستودع الوجهة <span class="required">*</span></label>
+                            <select id="transfer-dest-wh" class="form-control" required></select>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="transfer-dest-sec">القسم الوجهة <span class="required">*</span></label>
+                            <select id="transfer-dest-sec" class="form-control" required disabled></select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="transfer-qty">الكمية المراد نقلها <span class="required">*</span> <small id="transfer-qty-hint" class="unit-hint"></small></label>
+                        <input type="number" id="transfer-qty" class="form-control" min="0.001" step="any" required placeholder="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" data-close="transfer-modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary" id="transfer-submit-btn">
+                        <span class="btn-text">نقل المخزون</span>
+                        <div class="btn-loader hidden"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║            TOAST NOTIFICATIONS               ║
+         ╚══════════════════════════════════════════════╝ -->
+
+    <!-- ╔══════════════════════════════════════════════╗
+         ║             AUTH UI MODALS                   ║
+         ╚══════════════════════════════════════════════╝ -->
+
+    <!-- User Management Modal (Admins/Owners Only) -->
+    <div id="user-modal" class="modal-overlay hidden">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3>إدارة المستخدمين</h3>
+                <button type="button" class="btn-icon modal-close" data-close="user-modal" title="إغلاق">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="user-form" style="margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--border-light);">
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label>رقم المستخدم الجديد (ID)</label>
+                            <input type="text" id="new-user-id" class="form-control" required placeholder="مثال: 2" autocomplete="off">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>الصلاحية</label>
+                            <select id="new-user-role" class="form-control" required>
+                                <!-- Populated dynamically based on current user role -->
+                            </select>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: flex-end;">
+                            <button type="submit" id="btn-create-user" class="btn btn-primary" style="height: 42px;">إنشاء مستخدم</button>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 8px;">
+                        ملاحظة: سيتم إنشاء المستخدم بكلمة المرور الافتراضية <code>123456</code>. يمكنه تغييرها لاحقاً.
+                    </div>
+                </form>
+
+                <div class="users-list-container">
+                    <table class="history-table" style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>رقم المستخدم (ID)</th>
+                                <th>الصلاحية</th>
+                                <th>الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div id="password-modal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>تغيير كلمة المرور</h3>
+                <button type="button" class="btn-icon modal-close" data-close="password-modal" title="إغلاق">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="password-form">
+                    <!-- حقل مخفي للتوافق مع معايير الوصول للمتصفح -->
+                    <input type="text" autocomplete="username" style="display:none;" value="user">
+                    
+                    <div class="form-group">
+                        <label>كلمة المرور الحالية</label>
+                        <input type="password" id="current-password" class="form-control" required autocomplete="current-password">
+                    </div>
+                    <div class="form-group">
+                        <label>كلمة المرور الجديدة</label>
+                        <input type="password" id="new-password" class="form-control" required minlength="6" autocomplete="new-password">
+                    </div>
+                    <div class="action-buttons">
+                        <button type="submit" id="btn-save-password" class="btn btn-primary">حفظ التغيير</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <!-- App Logic (ES Modules) -->
+    <script type="module" src="firebase-init.js"></script>
+    <script type="module" src="state.js"></script>
+    <script type="module" src="ui.js"></script>
+    <script type="module" src="auth.js"></script>
+    <script type="module" src="inventory.js"></script>
+    <script type="module" src="reports.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+
+</html>

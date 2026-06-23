@@ -1,0 +1,23 @@
+{
+  "name": "JoStock",
+  "short_name": "JoStock",
+  "description": "نظام إدارة المخزون والمبيعات",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "imgs/logo.webp",
+      "sizes": "192x192",
+      "type": "image/webp"
+    },
+    {
+      "src": "imgs/logo.webp",
+      "sizes": "512x512",
+      "type": "image/webp"
+    }
+  ]
+}
