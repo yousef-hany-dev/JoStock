@@ -1562,12 +1562,25 @@ select.form-input {
 /* ── Small phones (≤ 480px) ── */
 @media (max-width: 480px) {
     :root {
-        --header-height: 60px;
+        --header-height: auto;
+    }
+
+    .header {
+        height: auto;
     }
 
     .header-inner {
-        padding: 0 var(--space-md);
+        padding: var(--space-sm) var(--space-md);
         gap: var(--space-sm);
+        flex-wrap: wrap;
+    }
+
+    .header-search {
+        width: 100%;
+        max-width: 100%;
+        order: 10;
+        flex: 1 1 100%;
+        padding-bottom: var(--space-xs);
     }
 
     .brand-name {
@@ -1579,7 +1592,8 @@ select.form-input {
     }
 
     .search-input {
-        font-size: var(--font-size-xs);
+        font-size: var(--font-size-sm);
+        padding: 10px 44px 10px var(--space-md);
     }
 
     .stats-grid {
@@ -1694,6 +1708,23 @@ select.form-input {
 
 /* ── Tablets (481px – 768px) ── */
 @media (min-width: 481px) and (max-width: 768px) {
+    .header {
+        height: auto;
+    }
+
+    .header-inner {
+        flex-wrap: wrap;
+        padding: var(--space-sm) var(--space-lg);
+    }
+
+    .header-search {
+        width: 100%;
+        max-width: 100%;
+        order: 10;
+        flex: 1 1 100%;
+        padding-bottom: var(--space-xs);
+    }
+
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
     }
