@@ -162,6 +162,20 @@ window.navigateToSection = (whId, secId) => {
     UI.renderItems(whId, secId);
 };
 
+window.goToItem = (whId, secId, itemId) => {
+    window.navigateToSection(whId, secId);
+    window.closeSearch();
+    setTimeout(() => {
+        const itemCard = document.querySelector(`.item-card[data-item-id="${itemId}"]`);
+        if (itemCard) {
+            itemCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            itemCard.classList.remove('search-highlight-target');
+            // Trigger reflow to restart animation if clicked multiple times
+            void itemCard.offsetWidth; 
+            itemCard.classList.add('search-highlight-target');
+        }
+    }, 100);
+};
 window.updateDashboard = () => {
     document.getElementById('stat-warehouses').textContent = AppState.warehouses.length;
     document.getElementById('stat-sections').textContent = AppState.sections.length;
@@ -566,7 +580,7 @@ function globalSearch(queryStr) {
             const isLow = i.minStockLevel > 0 && i.currentStock <= i.minStockLevel;
             const stockColor = isLow ? 'var(--danger-light)' : 'var(--success-light)';
             return `
-                <div class="search-result-item" onclick="window.navigateToSection('${i.whId}', '${i.secId}'); window.closeSearch();">
+                <div class="search-result-item" onclick="window.goToItem('${i.whId}', '${i.secId}', '${i.id}')">
                     <div style="font-weight: 500;">${UI.escapeHtml(i.name)}</div>
                     <div style="font-size: 0.8rem; color: var(--text-muted);">${i.whName} ← ${i.secName}</div>
                     <div style="font-size: 0.85rem; color: ${stockColor}; margin-top: 4px;">
