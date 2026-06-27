@@ -201,7 +201,7 @@ async function loadUsersTable() {
         
         tbody.innerHTML = users.map(u => {
             const roleName = u.role === 'superadmin' ? 'مدير نظام' : u.role === 'owner' ? 'مدير' : 'موظف';
-            const canDelete = AppState.userRole === 'superadmin' && u.uid !== AppState.currentUser.uid;
+            const canDelete = (AppState.userRole === 'superadmin' || AppState.userRole === 'owner') && u.uid !== AppState.currentUser.uid;
             
             const deleteBtn = canDelete ? `<button class="btn btn-sm btn-outline" style="color: var(--danger); border-color: var(--danger-light); margin-right: 5px;" onclick="window.deleteUser('${u.uid}', '${u.loginId}')">حذف</button>` : '';
             
