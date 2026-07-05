@@ -10,11 +10,13 @@ import {
     addItem, editItem, deleteItem,
     processStockTransaction, processTransferTransaction
 } from './inventory.js';
+import { initPinFeature, sortSectionsWithPinned } from './pin-sections.js';
 
 // ═══════════════════════════════════════════════
 //  APP INITIALIZATION & AUTH STATE
 // ═══════════════════════════════════════════════
 
+initPinFeature();
 UI.initUIEventListeners();
 
 onAuthStateChanged(auth, async (user) => {
@@ -31,7 +33,7 @@ onAuthStateChanged(auth, async (user) => {
                     const data = userDoc.data();
                     AppState.userRole = data.role;
                     AppState.userLoginId = data.loginId;
-                    document.getElementById('btn-user-management').classList.toggle('hidden', AppState.userRole === 'worker');
+                    document.getElementById('btn-user-management').classList.toggle('hidden', AppState.userRole === 'worker' || AppState.userRole === 'viewer');
                 } else {
                     const { signOut } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
                     await signOut(auth);
@@ -67,6 +69,7 @@ window.initApp = async () => {
     
     // Start real-time listeners (replaces old loadAllData one-time fetch)
     startInventoryListeners();
+    UI.applyRBAC();
     
     // The listeners will populate AppState and trigger renders automatically.
     // We just set initial view.
@@ -194,14 +197,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ADD BUTTONS
     document.getElementById('btn-add-warehouse').addEventListener('click', () => {
-        if (AppState.userRole === 'worker') { UI.showToast('غير مصرح لك بإضافة مستودع', 'error'); return; }
+        if (AppState.userRole === 'worker' || AppState.userRole === 'viewer') { UI.showToast('غير مصرح لك بإضافة مستودع', 'error'); return; }
         document.getElementById('wh-modal-title').textContent = 'إضافة مستودع جديد';
         document.getElementById('wh-edit-id').value = '';
         UI.openModal('warehouse-modal');
     });
 
     document.getElementById('btn-add-section').addEventListener('click', () => {
-        if (AppState.userRole === 'worker') { UI.showToast('غير مصرح لك بإضافة قسم', 'error'); return; }
+        if (AppState.userRole === 'worker' || AppState.userRole === 'viewer') { UI.showToast('غير مصرح لك بإضافة قسم', 'error'); return; }
         document.getElementById('sec-modal-title').textContent = 'إضافة قسم جديد';
         document.getElementById('sec-edit-id').value = '';
         UI.populateWarehouseSelect('sec-warehouse-select', AppState.selectedWarehouseId);
@@ -209,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('btn-add-item').addEventListener('click', () => {
-        if (AppState.userRole === 'worker') { UI.showToast('غير مصرح لك بإضافة صنف', 'error'); return; }
+        if (AppState.userRole === 'viewer') { UI.showToast('غير مصرح لك بإضافة صنف', 'error'); return; }
         document.getElementById('item-modal-title').textContent = 'إضافة صنف جديد';
         document.getElementById('item-edit-id').value = '';
         document.getElementById('item-initial-stock').disabled = false;
@@ -314,14 +317,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // FILTERS & SELECT DYNAMICS
     document.getElementById('warehouse-filter').addEventListener('change', (e) => {
-        if (e.target.value) window.navigateToWarehouse(e.target.value);
-        else window.navigateHome();
+        const val = e.target.value;
+        setTimeout(() => {
+            if (val) window.navigateToWarehouse(val);
+            else window.navigateHome();
+        }, 0);
     });
 
     document.getElementById('section-filter').addEventListener('change', (e) => {
         const whId = document.getElementById('warehouse-filter').value;
-        if (e.target.value) window.navigateToSection(whId, e.target.value);
-        else if (whId) window.navigateToWarehouse(whId);
+        const val = e.target.value;
+        setTimeout(() => {
+            if (val) window.navigateToSection(whId, val);
+            else if (whId) window.navigateToWarehouse(whId);
+        }, 0);
     });
 
     document.getElementById('item-warehouse-select').addEventListener('change', (e) => {
@@ -339,10 +348,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // LOW STOCK PANEL TOGGLE
     document.getElementById('stat-card-low-stock').addEventListener('click', () => {
-        document.getElementById('low-stock-panel').classList.toggle('hidden');
+        const lsPanel = document.getElementById('low-stock-panel');
+        lsPanel.classList.toggle('hidden');
+        const qvPanel = document.getElementById('quick-view-panel');
+        if(qvPanel) qvPanel.classList.add('hidden');
     });
     document.getElementById('btn-close-low-stock').addEventListener('click', () => {
         document.getElementById('low-stock-panel').classList.add('hidden');
+    });
+
+    // QUICK VIEW PANELS
+    document.getElementById('stat-card-warehouses').addEventListener('click', () => {
+        UI.renderQuickViewPanel('warehouses', AppState.warehouses);
+    });
+    document.getElementById('stat-card-sections').addEventListener('click', () => {
+        // Apply the same FIFO pin-sort used in renderSections for full consistency
+        UI.renderQuickViewPanel('sections', sortSectionsWithPinned(AppState.sections));
+    });
+    document.getElementById('stat-card-items').addEventListener('click', () => {
+        const sortedItems = [...AppState.items].sort((a, b) => b.createdAt - a.createdAt);
+        UI.renderQuickViewPanel('items', sortedItems.slice(0, 10));
     });
 
     // GLOBAL SEARCH
@@ -365,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════════
 
 window.openEditWarehouse = (whId) => {
-    if (AppState.userRole === 'worker') { UI.showToast('غير مصرح', 'error'); return; }
+    if (AppState.userRole === 'worker' || AppState.userRole === 'viewer') { UI.showToast('غير مصرح', 'error'); return; }
     const wh = AppState.warehouses.find(w => w.id === whId);
     if (!wh) return;
     document.getElementById('wh-modal-title').textContent = 'تعديل مستودع';
@@ -382,7 +407,7 @@ window.confirmDeleteWarehouse = (whId, name) => {
 };
 
 window.openEditSection = (whId, secId) => {
-    if (AppState.userRole === 'worker') { UI.showToast('غير مصرح', 'error'); return; }
+    if (AppState.userRole === 'worker' || AppState.userRole === 'viewer') { UI.showToast('غير مصرح', 'error'); return; }
     const sec = AppState.sections.find(s => s.id === secId);
     if (!sec) return;
     document.getElementById('sec-modal-title').textContent = 'تعديل قسم';
@@ -400,7 +425,7 @@ window.confirmDeleteSection = (whId, secId, name) => {
 };
 
 window.openEditItem = (whId, secId, itemId) => {
-    if (AppState.userRole === 'worker') { UI.showToast('غير مصرح', 'error'); return; }
+    if (AppState.userRole === 'worker' || AppState.userRole === 'viewer') { UI.showToast('غير مصرح', 'error'); return; }
     const item = AppState.items.find(i => i.id === itemId);
     if (!item) return;
     
@@ -432,6 +457,7 @@ window.confirmDeleteItem = (whId, secId, itemId, name) => {
 };
 
 window.openStockModal = (whId, secId, itemId, type) => {
+    if (AppState.userRole === 'viewer') { UI.showToast('غير مصرح لك بإجراء عمليات المخزون', 'error'); return; }
     const item = AppState.items.find(i => i.id === itemId);
     if (!item) return;
     
@@ -451,6 +477,7 @@ window.openStockModal = (whId, secId, itemId, type) => {
 };
 
 window.openTransferModal = (itemId) => {
+    if (AppState.userRole === 'viewer') { UI.showToast('غير مصرح لك بعمليات النقل', 'error'); return; }
     const item = AppState.items.find(i => i.id === itemId);
     if (!item) return;
     

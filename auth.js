@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     AppState.userRole = data.role;
                     AppState.userLoginId = data.loginId;
                     
-                    document.getElementById('btn-user-management').classList.toggle('hidden', AppState.userRole === 'worker');
+                    document.getElementById('btn-user-management').classList.toggle('hidden', AppState.userRole === 'worker' || AppState.userRole === 'viewer');
                     document.getElementById('login-overlay').classList.add('hidden');
                     
                     if (window.initApp) {
@@ -168,16 +168,17 @@ window.openChangePasswordModal = () => UI.openModal('password-modal');
 
 window.openUserManagementModal = () => {
     // RBAC: strict check
-    if (AppState.userRole === 'worker' || !AppState.userRole) return;
+    if (AppState.userRole === 'worker' || AppState.userRole === 'viewer' || !AppState.userRole) return;
     
     UI.openModal('user-modal');
     
     const roleSelect = document.getElementById('new-user-role');
     roleSelect.innerHTML = '';
-    if (AppState.userRole === 'superadmin') {
+    if (AppState.userRole === 'superadmin' || AppState.userRole === 'owner') {
         roleSelect.innerHTML += `<option value="owner">مدير (Owner)</option>`;
     }
     roleSelect.innerHTML += `<option value="worker">موظف (Worker)</option>`;
+    roleSelect.innerHTML += `<option value="viewer">موظف مشاهد (Viewer)</option>`;
     
     loadUsersTable();
 };
@@ -200,7 +201,7 @@ async function loadUsersTable() {
         }
         
         tbody.innerHTML = users.map(u => {
-            const roleName = u.role === 'superadmin' ? 'مدير نظام' : u.role === 'owner' ? 'مدير' : 'موظف';
+            const roleName = u.role === 'superadmin' ? 'مدير نظام' : u.role === 'owner' ? 'مدير' : u.role === 'worker' ? 'موظف' : 'موظف مشاهد';
             const canDelete = (AppState.userRole === 'superadmin' || AppState.userRole === 'owner') && u.uid !== AppState.currentUser.uid;
             
             const deleteBtn = canDelete ? `<button class="btn btn-sm btn-outline" style="color: var(--danger); border-color: var(--danger-light); margin-right: 5px;" onclick="window.deleteUser('${u.uid}', '${u.loginId}')">حذف</button>` : '';

@@ -171,9 +171,10 @@ async function _fetchGlobalHistory() {
     const whId = document.getElementById('gl-filter-wh').value;
     const secId = document.getElementById('gl-filter-sec').value;
     const itemId = document.getElementById('gl-filter-item').value;
+    const typeFilter = document.getElementById('gl-filter-type')?.value;
 
     // Show loading state
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">جاري جلب الحركات...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align: center;">جاري جلب الحركات...</td></tr>';
     emptyState.classList.add('hidden');
     resultsInfo.classList.add('hidden');
     UI.setButtonLoading('btn-gl-search', true);
@@ -221,6 +222,7 @@ async function _fetchGlobalHistory() {
                 quantity: data.quantity || 0,
                 balanceAfter: data.balanceAfter || 0,
                 note: data.note || '',
+                empCode: data.empCode || '',
                 itemId: parentItemId,
                 whId: item?.whId || '',
                 secId: item?.secId || '',
@@ -241,6 +243,9 @@ async function _fetchGlobalHistory() {
         }
         if (itemId) {
             results = results.filter(r => r.itemId === itemId);
+        }
+        if (typeFilter) {
+            results = results.filter(r => r.type === typeFilter);
         }
 
         // Render results and calculate totals
@@ -287,6 +292,7 @@ async function _fetchGlobalHistory() {
                     <td style="font-weight: bold;">${qDisplay}</td>
                     <td>${bDisplay}</td>
                     <td>${UI.escapeHtml(r.note || '-')}</td>
+                    <td>${UI.escapeHtml(r.empCode || '-')}</td>
                 </tr>`;
             }).join('');
         }
@@ -310,7 +316,7 @@ async function _fetchGlobalHistory() {
             UI.showToast("حدث خطأ أثناء جلب سجل الحركات", "error");
         }
 
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--danger);">خطأ في جلب البيانات - تحقق من الكونسول</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: var(--danger);">خطأ في جلب البيانات - تحقق من الكونسول</td></tr>';
         document.getElementById('report-total-in').textContent = 'خطأ';
         document.getElementById('report-total-out').textContent = 'خطأ';
         document.getElementById('report-total-items').textContent = 'خطأ';
@@ -335,6 +341,9 @@ function _resetGlobalFilters() {
     const itemSelect = document.getElementById('gl-filter-item');
     itemSelect.innerHTML = '<option value="">الكل</option>';
     itemSelect.disabled = true;
+
+    const typeFilter = document.getElementById('gl-filter-type');
+    if (typeFilter) typeFilter.value = '';
 
     // Trigger search to refresh table and totals with today's date
     _fetchGlobalHistory();

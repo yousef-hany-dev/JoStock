@@ -10,7 +10,7 @@ export const AppState = {
 
     // AUTH UPDATE: Add auth state
     currentUser: null,
-    userRole: null, // 'superadmin', 'owner', 'worker'
+    userRole: null, // 'superadmin', 'owner', 'worker', 'viewer'
     userLoginId: null,
 
     /** Currently selected warehouse filter (null = all) */

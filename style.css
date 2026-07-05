@@ -455,6 +455,31 @@ body {
     box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
 }
 
+/* Clickable stat cards for quick view */
+.stat-warehouses {
+    cursor: pointer;
+}
+.stat-warehouses:hover {
+    border-color: var(--info);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+}
+
+.stat-sections {
+    cursor: pointer;
+}
+.stat-sections:hover {
+    border-color: #a855f7;
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.15);
+}
+
+.stat-items {
+    cursor: pointer;
+}
+.stat-items:hover {
+    border-color: var(--success);
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.15);
+}
+
 
 /* ──────────────────────────────────────────────
    5. LOW STOCK ALERTS PANEL
@@ -1890,4 +1915,120 @@ select.form-input {
 
 #btn-login:hover {
     background: var(--primary-dark);
+}
+
+/* ----------------------------------------------- */
+/*  PIN SECTIONS FEATURE (Isolated Styles)         */
+/* ----------------------------------------------- */
+
+/* Pin button */
+.btn-pin {
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+.btn-pin:hover {
+    color: var(--text-primary);
+    transform: scale(1.1);
+}
+.btn-pin-active {
+    color: var(--primary) !important;
+}
+
+/* Pinned card accent */
+.nav-card-pinned {
+    border-color: var(--primary);
+}
+.nav-card-pinned::before {
+    opacity: 1;
+}
+
+/* Smooth transition for reordering */
+.nav-card {
+    transition: all 0.3s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+/* ── Quick View Theme: Blue (Warehouses) ── */
+.panel-header.theme-blue {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-bottom: none;
+}
+.panel-header.theme-blue .panel-title { color: #93c5fd; }
+.panel-header.theme-blue .btn-icon-close { color: #93c5fd; }
+.panel-header.theme-blue .btn-icon-close:hover { background: rgba(59, 130, 246, 0.2); }
+.panel-header.theme-blue + .low-stock-list { border: 1px solid rgba(59, 130, 246, 0.2); border-top: none; }
+
+/* ── Quick View Theme: Purple (Sections) ── */
+.panel-header.theme-purple {
+    background: rgba(168, 85, 247, 0.1);
+    border: 1px solid rgba(168, 85, 247, 0.25);
+    border-bottom: none;
+}
+.panel-header.theme-purple .panel-title { color: #d8b4fe; }
+.panel-header.theme-purple .btn-icon-close { color: #d8b4fe; }
+.panel-header.theme-purple .btn-icon-close:hover { background: rgba(168, 85, 247, 0.2); }
+.panel-header.theme-purple + .low-stock-list { border: 1px solid rgba(168, 85, 247, 0.2); border-top: none; }
+
+/* ── Quick View Theme: Green (Items) ── */
+.panel-header.theme-green {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    border-bottom: none;
+}
+.panel-header.theme-green .panel-title { color: #86efac; }
+.panel-header.theme-green .btn-icon-close { color: #86efac; }
+.panel-header.theme-green .btn-icon-close:hover { background: rgba(34, 197, 94, 0.2); }
+.panel-header.theme-green + .low-stock-list { border: 1px solid rgba(34, 197, 94, 0.2); border-top: none; }
+
+/* ── Quick View List & Footer ── */
+.qv-list {
+    border-radius: 0 !important;
+}
+.no-footer .qv-list {
+    border-radius: 0 0 var(--radius-md) var(--radius-md) !important;
+}
+
+.qv-footer {
+    padding: var(--space-sm) var(--space-lg);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.qv-go-btn {
+    width: 100%;
+    justify-content: center;
+    gap: var(--space-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+/* Footer theme overrides */
+.panel-header.theme-blue ~ .qv-footer { border-color: rgba(59, 130, 246, 0.2); }
+.panel-header.theme-blue ~ .qv-footer .qv-go-btn {
+    background: rgba(59, 130, 246, 0.15);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.panel-header.theme-blue ~ .qv-footer .qv-go-btn:hover {
+    background: rgba(59, 130, 246, 0.25);
+}
+
+.panel-header.theme-purple ~ .qv-footer { border-color: rgba(168, 85, 247, 0.2); }
+.panel-header.theme-purple ~ .qv-footer .qv-go-btn {
+    background: rgba(168, 85, 247, 0.15);
+    color: #d8b4fe;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+.panel-header.theme-purple ~ .qv-footer .qv-go-btn:hover {
+    background: rgba(168, 85, 247, 0.25);
+}
+
+.panel-header.theme-green ~ .qv-footer { border-color: rgba(34, 197, 94, 0.2); }
+.panel-header.theme-green ~ .qv-footer .qv-go-btn {
+    background: rgba(34, 197, 94, 0.15);
+    color: #86efac;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.panel-header.theme-green ~ .qv-footer .qv-go-btn:hover {
+    background: rgba(34, 197, 94, 0.25);
 }

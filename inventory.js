@@ -12,6 +12,9 @@ export function startInventoryListeners() {
     // Listen to Warehouses
     const whUnsub = onSnapshot(collection(db, 'warehouses'), (snapshot) => {
         AppState.warehouses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const currentWhVal = document.getElementById('warehouse-filter').value;
+        UI.populateWarehouseFilterOptions();
+        document.getElementById('warehouse-filter').value = currentWhVal;
         if (window.rerenderCurrentView) window.rerenderCurrentView();
     }, (error) => handleListenerError(error, 'المستودعات'));
     unsubs.push(whUnsub);
@@ -19,6 +22,11 @@ export function startInventoryListeners() {
     // Listen to Sections
     const secUnsub = onSnapshot(collection(db, 'sections'), (snapshot) => {
         AppState.sections = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (AppState.selectedWarehouseId) {
+            const currentSecVal = document.getElementById('section-filter').value;
+            UI.populateSectionFilterOptions(AppState.selectedWarehouseId);
+            document.getElementById('section-filter').value = currentSecVal;
+        }
         if (window.rerenderCurrentView) window.rerenderCurrentView();
     }, (error) => handleListenerError(error, 'الأقسام'));
     unsubs.push(secUnsub);
@@ -242,7 +250,8 @@ export async function addItem(whId, secId, data) {
                 quantity: data.initialStock,
                 balanceAfter: data.initialStock,
                 date: serverTimestamp(),
-                note: 'رصيد افتتاحي'
+                note: 'رصيد افتتاحي',
+                empCode: AppState.userLoginId || ''
             });
         }
         await batch.commit();
@@ -286,7 +295,8 @@ export async function editItem(whId, secId, itemId, data) {
                 quantity: Math.abs(diff),
                 balanceAfter: data.currentStock,
                 date: serverTimestamp(),
-                note: 'تعديل رصيد يدوي'
+                note: 'تعديل خطأ',
+                empCode: AppState.userLoginId || ''
             });
         }
 
@@ -354,7 +364,8 @@ export async function processStockTransaction(whId, secId, itemId, type, display
             quantity: baseQty,
             balanceAfter: optimisticBalance, // Optimistic balance estimation
             date: serverTimestamp(),
-            note: note || ''
+            note: note || '',
+            empCode: AppState.userLoginId || ''
         });
 
         await batch.commit();
@@ -401,7 +412,8 @@ export async function processTransferTransaction(sourceItemId, sourceWhId, sourc
             quantity: baseQty,
             balanceAfter: sourceItem.currentStock - baseQty,
             date: serverTimestamp(),
-            note: `نقل إلى مستودع/قسم آخر`
+            note: `نقل إلى مستودع/قسم آخر`,
+            empCode: AppState.userLoginId || ''
         });
 
         if (destItem) {
@@ -417,7 +429,8 @@ export async function processTransferTransaction(sourceItemId, sourceWhId, sourc
                 quantity: baseQty,
                 balanceAfter: destItem.currentStock + baseQty,
                 date: serverTimestamp(),
-                note: `نقل من ${sourceItem.whName} / ${sourceItem.secName}`
+                note: `نقل من ${sourceItem.whName} / ${sourceItem.secName}`,
+                empCode: AppState.userLoginId || ''
             });
         } else {
             // Create new item in destination
@@ -445,7 +458,8 @@ export async function processTransferTransaction(sourceItemId, sourceWhId, sourc
                 quantity: baseQty,
                 balanceAfter: baseQty,
                 date: serverTimestamp(),
-                note: `نقل من ${sourceItem.whName} / ${sourceItem.secName}`
+                note: `نقل من ${sourceItem.whName} / ${sourceItem.secName}`,
+                empCode: AppState.userLoginId || ''
             });
         }
 

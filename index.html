@@ -228,6 +228,35 @@
     </section>
 
     <!-- ╔══════════════════════════════════════════════╗
+         ║           QUICK VIEW PANEL                   ║
+         ╚══════════════════════════════════════════════╝ -->
+    <section id="quick-view-panel" class="low-stock-panel hidden">
+        <div class="panel-header">
+            <div class="panel-title">
+                <svg id="quick-view-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" width="20" height="20">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <h3 id="quick-view-title">نظرة سريعة</h3>
+            </div>
+            <button id="btn-close-quick-view" class="btn-icon-close" title="إغلاق">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" width="18" height="18">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </button>
+        </div>
+        <div id="quick-view-list" class="low-stock-list qv-list">
+            <!-- Populated dynamically by JS -->
+        </div>
+        <div id="quick-view-footer" class="qv-footer">
+            <button id="btn-quick-view-go" class="btn btn-primary qv-go-btn">الانتقال للقائمة الكاملة</button>
+        </div>
+    </section>
+
+    <!-- ╔══════════════════════════════════════════════╗
          ║          ACTION BAR (Filters + Buttons)      ║
          ╚══════════════════════════════════════════════╝ -->
     <section class="action-bar">
@@ -408,6 +437,14 @@
                                 <option value="">الكل</option>
                             </select>
                         </div>
+                        <div class="form-group" style="margin-bottom: 0; min-width: 120px;">
+                            <label style="font-size: 0.8rem; margin-bottom: 2px;">نوع الحركة</label>
+                            <select id="gl-filter-type" class="form-control" style="padding: 6px; font-size: 0.9rem;">
+                                <option value="">الكل</option>
+                                <option value="وارد">وارد</option>
+                                <option value="صادر">صادر</option>
+                            </select>
+                        </div>
                         <div style="display: flex; gap: 6px; align-self: flex-end;">
                             <button type="button" class="btn btn-primary btn-sm" id="btn-gl-search" style="height: 34px;">
                                 <span class="btn-text">بحث</span>
@@ -439,10 +476,11 @@
                                     <th>الكمية</th>
                                     <th>الرصيد بعد</th>
                                     <th>ملاحظة</th>
+                                    <th>الموظف</th>
                                 </tr>
                             </thead>
                             <tbody id="gl-history-body">
-                                <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">اختر التاريخ واضغط "بحث" لعرض الحركات</td></tr>
+                                <tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">اختر التاريخ واضغط "بحث" لعرض الحركات</td></tr>
                             </tbody>
                         </table>
                     </div>
