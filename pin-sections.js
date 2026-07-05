@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════
-//  PIN SECTIONS FEATURE — Isolated Helper Module
-//  يجب عدم تعديل هذا الملف من قبل ملفات أخرى
+//  PIN FEATURE — Isolated Helper Module
+//  يشمل تثبيت الأقسام والأصناف معاً
 //  هذا الملف معزول تماماً عن الأكواد الأساسية
 // ═══════════════════════════════════════════════
 
@@ -159,16 +159,174 @@ export function buildPinButtonHTML(secId, isPinned) {
         </button>`;
 }
 
+// ═══════════════════════════════════════════════
+//  ITEMS PINNING — Same pattern as Sections
+// ═══════════════════════════════════════════════
+
 // ─────────────────────────────────────────────
-//  INITIALIZATION — Register global handler
+//  SORTING HELPER — ITEMS
 // ─────────────────────────────────────────────
 
 /**
- * Registers the global toggle function on `window`.
+ * Sorts items array so pinned items appear first.
+ * Among pinned items, sorts by `pinnedAt` ascending (FIFO — oldest pin on top).
+ * Old documents without `isPinned` are treated as `false` (safe for live data).
+ * Unpinned items preserve their original relative order.
+ *
+ * @param {Array} items - Array of item objects
+ * @returns {Array} New sorted array (does NOT mutate original)
+ */
+export function sortItemsWithPinned(items) {
+    const pinned = [];
+    const unpinned = [];
+
+    for (const item of items) {
+        if (item.isPinned) {
+            pinned.push(item);
+        } else {
+            unpinned.push(item);
+        }
+    }
+
+    // Sort pinned items: earliest pinned appears first (FIFO order).
+    // The item pinned first stays at the top; newer pins stack below it.
+    // Falls back to item name if pinnedAt is missing (legacy documents).
+    pinned.sort((a, b) => {
+        const aTime = a.pinnedAt?.toMillis?.() ?? a.pinnedAt ?? 0;
+        const bTime = b.pinnedAt?.toMillis?.() ?? b.pinnedAt ?? 0;
+        if (aTime !== bTime) return aTime - bTime; // oldest pin on top (FIFO)
+        return (a.name ?? '').localeCompare(b.name ?? '', 'ar'); // stable fallback
+    });
+
+    return [...pinned, ...unpinned];
+}
+
+/**
+ * Checks if there are any pinned items in the given list.
+ * Used to decide whether to render a separator.
+ *
+ * @param {Array} items
+ * @returns {boolean}
+ */
+export function hasPinnedItems(items) {
+    return items.some(i => i.isPinned);
+}
+
+// ─────────────────────────────────────────────
+//  TOGGLE PIN — ITEMS (Optimistic UI + Firestore)
+// ─────────────────────────────────────────────
+
+/**
+ * Toggles the pin state of an item.
+ * Implements Optimistic UI:
+ *   1. Immediately updates AppState & re-renders
+ *   2. Sends updateDoc to Firestore in background
+ *   3. On failure → rollback + error toast
+ *
+ * When pinning   → writes isPinned:true  + pinnedAt:serverTimestamp()
+ * When unpinning → writes isPinned:false + pinnedAt:null (cleanup)
+ *
+ * Only updates the SINGLE document the user clicked (no batch).
+ * Does NOT touch currentStock or any other sensitive field.
+ *
+ * @param {string} itemId - Item document ID
+ * @param {boolean} currentPinState - Current pin state
+ */
+export async function toggleItemPin(itemId, currentPinState) {
+    const newPinState = !currentPinState;
+
+    // ① Take snapshot for rollback
+    const snapshot = takeSnapshot();
+
+    // ② Optimistic UI: Update AppState immediately.
+    //    Use Date.now() as a local timestamp so the sort is correct
+    //    before the Firestore serverTimestamp() resolves.
+    const itemIndex = AppState.items.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) return;
+
+    AppState.items[itemIndex] = {
+        ...AppState.items[itemIndex],
+        isPinned: newPinState,
+        pinnedAt: newPinState ? Date.now() : null   // local optimistic value
+    };
+
+    // ③ Re-render immediately for instant feedback
+    if (window.rerenderCurrentView) {
+        window.rerenderCurrentView();
+    }
+
+    // ④ Build the Firestore payload — ONLY pin fields, nothing else
+    const firestorePayload = newPinState
+        ? { isPinned: true,  pinnedAt: serverTimestamp() }
+        : { isPinned: false, pinnedAt: null };
+
+    // ⑤ Send to Firestore in background
+    try {
+        await updateDoc(doc(db, 'items', itemId), firestorePayload);
+        // Success — onSnapshot will reconcile pinnedAt with the real server value
+    } catch (error) {
+        console.error('Error toggling pin for item:', itemId, error);
+
+        // ⑥ Rollback on failure
+        restoreSnapshot(snapshot);
+        if (window.rerenderCurrentView) {
+            window.rerenderCurrentView();
+        }
+
+        // ⑦ Handle specific error types
+        if (error.code === 'failed-precondition') {
+            console.error(
+                '⚠️ Firebase Index Required. Create the index using the link below:\n',
+                error.message
+            );
+            UI.showToast('يتم الآن تهيئة النظام، يرجى المحاولة بعد قليل', 'warning', 5000);
+        } else if (error.code === 'permission-denied') {
+            UI.showToast('غير مصرح لك بتعديل الأصناف', 'error');
+        } else {
+            UI.showToast('حدث خطأ أثناء تحديث التثبيت، يرجى المحاولة مرة أخرى', 'error');
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+//  PIN BUTTON SVG BUILDER — ITEMS
+// ─────────────────────────────────────────────
+
+/**
+ * Returns the HTML string for the item pin toggle button.
+ *
+ * @param {string} itemId - Item ID
+ * @param {boolean} isPinned - Current pin state
+ * @returns {string} HTML string
+ */
+export function buildItemPinButtonHTML(itemId, isPinned) {
+    const title = isPinned ? 'إلغاء تثبيت الصنف' : 'تثبيت الصنف';
+    const activeClass = isPinned ? 'btn-pin-active' : '';
+
+    return `
+        <button class="btn-icon btn-pin btn-pin-item ${activeClass}"
+                onclick="event.stopPropagation(); window.__togglePinItem('${itemId}', ${isPinned})"
+                title="${title}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M12 2l2.09 6.26L20 9.27l-5 3.87L16.18 20 12 16.77 7.82 20 9 13.14l-5-3.87 5.91-1.01z"/>
+            </svg>
+        </button>`;
+}
+
+// ─────────────────────────────────────────────
+//  INITIALIZATION — Register global handlers
+// ─────────────────────────────────────────────
+
+/**
+ * Registers the global toggle functions on `window`.
  * Called once from app.js during initialization.
  */
 export function initPinFeature() {
     window.__togglePinSection = (secId, currentPinState) => {
         toggleSectionPin(secId, currentPinState);
+    };
+
+    window.__togglePinItem = (itemId, currentPinState) => {
+        toggleItemPin(itemId, currentPinState);
     };
 }

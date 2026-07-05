@@ -1934,7 +1934,7 @@ select.form-input {
     color: var(--primary) !important;
 }
 
-/* Pinned card accent */
+/* Pinned section card accent */
 .nav-card-pinned {
     border-color: var(--primary);
 }
@@ -1945,6 +1945,28 @@ select.form-input {
 /* Smooth transition for reordering */
 .nav-card {
     transition: all 0.3s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+/* ── Pinned Item Card ── */
+/* Adds a warm amber accent border to pinned item cards,
+   consistent with the star icon color used for pinning */
+.item-card-pinned {
+    border-color: var(--warning, #f59e0b) !important;
+    box-shadow: inset 3px 0 0 var(--warning, #f59e0b), var(--shadow-card, 0 2px 8px rgba(0,0,0,.15));
+}
+
+/* Small pin button inside item cards — slightly smaller than section pins */
+.btn-pin-item {
+    flex-shrink: 0;
+    opacity: 0.45;
+    transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease;
+}
+.item-card:hover .btn-pin-item,
+.btn-pin-item.btn-pin-active {
+    opacity: 1;
+}
+.btn-pin-item.btn-pin-active {
+    color: var(--warning, #f59e0b) !important;
 }
 /* ── Quick View Theme: Blue (Warehouses) ── */
 .panel-header.theme-blue {

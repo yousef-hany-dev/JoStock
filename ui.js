@@ -1,5 +1,5 @@
 import { AppState } from './state.js';
-import { sortSectionsWithPinned, buildPinButtonHTML } from './pin-sections.js';
+import { sortSectionsWithPinned, buildPinButtonHTML, sortItemsWithPinned, buildItemPinButtonHTML } from './pin-sections.js';
 
 // ============================================================================
 //  UNIT CONVERSION MATH
@@ -316,13 +316,7 @@ export function renderSections(whId) {
     container.innerHTML = sorted.map(sec => {
         const isPinned = sec.isPinned;
         const itemCount = AppState.items.filter(i => i.secId === sec.id).length;
-        let pinBtnHTML = '';
-        if (AppState.userRole !== 'viewer') {
-            pinBtnHTML = buildPinButtonHTML(sec.id, isPinned);
-        } else if (isPinned) {
-            // للمشاهدين: عرض أيقونة نجمة ثابتة (غير قابلة للنقر) ليعرفوا أن القسم مثبت
-            pinBtnHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" width="16" height="16" style="color:var(--warning,#f59e0b);"><path d="M12 2l2.09 6.26L20 9.27l-5 3.87L16.18 20 12 16.77 7.82 20 9 13.14l-5-3.87 5.91-1.01z"/></svg>';
-        }
+        const pinBtnHTML = buildPinButtonHTML(sec.id, isPinned);
         
         let actionsHtml = '';
         if (AppState.userRole !== 'viewer') {
@@ -357,8 +351,11 @@ export function renderItems(whId, secId) {
     const container = document.getElementById('items-view');
     const emptyState = document.getElementById('empty-state');
     const filtered = AppState.items.filter(i => i.whId === whId && i.secId === secId);
-    
-    if (filtered.length === 0) {
+
+    // PIN FEATURE: Sort items with pinned first (FIFO), same logic as sections
+    const sorted = sortItemsWithPinned(filtered);
+
+    if (sorted.length === 0) {
         container.classList.add('hidden');
         emptyState.classList.remove('hidden');
         document.getElementById('empty-text').textContent = 'لا توجد أصناف';
@@ -367,19 +364,27 @@ export function renderItems(whId, secId) {
     }
     emptyState.classList.add('hidden');
     container.classList.remove('hidden');
-    container.innerHTML = filtered.map(item => {
+
+    // RBAC: Pin button is visible only to non-viewers
+    const canPin = AppState.userRole !== 'viewer';
+
+    container.innerHTML = sorted.map(item => {
+        const isPinned = item.isPinned ?? false;
         const stockDisplay = formatStock(item.currentStock, item.unitType, item.cartonCapacity);
         const minDisplay = formatStock(item.minStockLevel, item.unitType, item.cartonCapacity);
         let statusClass = 'stock-healthy';
         let barClass = 'bar-healthy';
         let barWidth = 100;
-        
+
         if (item.minStockLevel > 0) {
             const ratio = item.currentStock / item.minStockLevel;
             if (ratio <= 0.5) { statusClass = 'stock-critical'; barClass = 'bar-critical'; }
             else if (ratio <= 1) { statusClass = 'stock-warning'; barClass = 'bar-warning'; }
             barWidth = Math.min(100, Math.round((item.currentStock / (item.minStockLevel * 2)) * 100));
         }
+
+        // PIN BUTTON: only rendered for superadmin, owner, worker — hidden from viewer
+        const pinBtnHTML = canPin ? buildItemPinButtonHTML(item.id, isPinned) : '';
 
         let actionsHtml = `<div class="item-actions">`;
         if (AppState.userRole !== 'viewer') {
@@ -388,21 +393,24 @@ export function renderItems(whId, secId) {
                 <button class="btn btn-sm btn-outline btn-stock-out" onclick="window.openStockModal('${item.whId}','${item.secId}','${item.id}','صادر')">- صادر</button>
                 <button class="btn btn-sm btn-outline btn-transfer" onclick="window.openTransferModal('${item.id}')" style="color: var(--accent); border-color: var(--border-light);">نقل</button>`;
         }
-        
+
         // History button visible to all
-        actionsHtml += `<button class="btn btn-sm btn-outline btn-history" onclick="window.openHistoryModal('${item.whId}','${item.secId}','${item.id}')">سجل</button>`;
-        
+        actionsHtml += `<button class="btn btn-sm btn-outline btn-history" onclick="window.openHistoryModal('${item.whId}','${item.secId}','${item.id}')">\u0633\u062c\u0644</button>`;
+
         if (AppState.userRole !== 'viewer') {
             actionsHtml += `
                 <button class="btn btn-sm btn-outline btn-edit" onclick="window.openEditItem('${item.whId}','${item.secId}','${item.id}')">تعديل</button>
-                <button class="btn btn-sm btn-outline btn-delete" onclick="window.confirmDeleteItem('${item.whId}','${item.secId}','${item.id}','${escapeJsString(item.name)}')">حذف</button>`;
+                <button class="btn btn-sm btn-outline btn-delete" onclick="window.confirmDeleteItem('${item.whId}','${item.secId}','${item.id}','${escapeJsString(item.name)}')">\u062d\u0630\u0641</button>`;
         }
         actionsHtml += `</div>`;
 
         return `
-        <div class="item-card ${statusClass} fade-in" id="item-card-${item.id}" data-item-id="${item.id}">
+        <div class="item-card ${statusClass} ${isPinned ? 'item-card-pinned' : ''} fade-in" id="item-card-${item.id}" data-item-id="${item.id}">
             <div class="item-card-header">
-                <span class="item-name">${escapeHtml(item.name)}</span>
+                <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                    ${pinBtnHTML}
+                    <span class="item-name">${escapeHtml(item.name)}</span>
+                </div>
                 <span class="item-unit-badge">${escapeHtml(item.unitType)}</span>
             </div>
             <div class="item-stock-section">
