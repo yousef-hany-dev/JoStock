@@ -1,5 +1,5 @@
 import { db } from './firebase-init.js';
-import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, increment, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, increment, serverTimestamp, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { AppState } from './state.js';
 import * as UI from './ui.js';
 
@@ -328,12 +328,15 @@ export async function deleteItem(whId, secId, itemId) {
 }
 
 // ═══════════════════════════════════════════════
-//  STOCK TRANSACTIONS
+//  STOCK TRANSACTIONS (runTransaction — Race-Condition Safe)
 // ═══════════════════════════════════════════════
 
 export async function processStockTransaction(whId, secId, itemId, type, displayQty, note) {
     const item = AppState.items.find(i => i.id === itemId);
     if (!item) return;
+
+    // ── DATA SANITIZATION: trim whitespace to prevent hidden-char logic errors ──
+    const sanitizedType = type.trim();
 
     const baseQty = UI.toBaseUnit(displayQty, item.unitType, item.cartonCapacity);
     if (baseQty <= 0) {
@@ -341,39 +344,67 @@ export async function processStockTransaction(whId, secId, itemId, type, display
         return;
     }
 
-    if (type === 'صادر' && baseQty > item.currentStock) {
+    // Optimistic pre-check for instant UI feedback (will be RE-validated inside transaction)
+    if (sanitizedType === 'صادر' && baseQty > item.currentStock) {
         UI.showToast('الكمية المطلوبة أكبر من الرصيد المتاح', 'error');
         return;
     }
 
-    const delta = type === 'وارد' ? baseQty : -baseQty;
-    const optimisticBalance = item.currentStock + delta;
-
     try {
-        const batch = writeBatch(db);
         const itemRef = doc(db, 'items', itemId);
-        
-        batch.update(itemRef, {
-            currentStock: increment(delta),
-            updatedAt: serverTimestamp()
+
+        // ══ FIRESTORE TRANSACTION: Atomic read → validate → write ══
+        // WriteBatch was blind: it used increment() without reading the live stock,
+        // so two concurrent operations could both pass local validation on stale data.
+        // runTransaction reads the LIVE document under a lock. If the document changes
+        // mid-transaction, Firestore automatically retries (up to 5 times).
+        await runTransaction(db, async (transaction) => {
+            // Step 1: Read the LIVE document inside the transaction lock
+            const itemSnap = await transaction.get(itemRef);
+            if (!itemSnap.exists()) {
+                throw new Error('ITEM_NOT_FOUND');
+            }
+
+            const liveData = itemSnap.data();
+            const liveStock = liveData.currentStock || 0;
+
+            // Step 2: Re-validate with LIVE stock (race-condition proof)
+            if (sanitizedType === 'صادر' && baseQty > liveStock) {
+                throw new Error('INSUFFICIENT_STOCK');
+            }
+
+            // Step 3: Compute exact new balance from live data
+            const delta = sanitizedType === 'وارد' ? baseQty : -baseQty;
+            const newBalance = liveStock + delta;
+
+            // Step 4: Atomic writes — stock update + history log
+            transaction.update(itemRef, {
+                currentStock: newBalance,  // Exact value, not increment — we know the live stock
+                updatedAt: serverTimestamp()
+            });
+
+            const logRef = doc(collection(db, `items/${itemId}/historyLog`));
+            transaction.set(logRef, {
+                type: sanitizedType,
+                quantity: baseQty,
+                balanceAfter: newBalance,  // Accurate (from live read), not optimistic
+                date: serverTimestamp(),
+                note: note || '',
+                empCode: AppState.userLoginId || ''
+            });
         });
 
-        const logRef = doc(collection(db, `items/${itemId}/historyLog`));
-        batch.set(logRef, {
-            type: type,
-            quantity: baseQty,
-            balanceAfter: optimisticBalance, // Optimistic balance estimation
-            date: serverTimestamp(),
-            note: note || '',
-            empCode: AppState.userLoginId || ''
-        });
-
-        await batch.commit();
-        UI.showToast(`تم تسجيل حركة ${type} بنجاح`, 'success');
+        UI.showToast(`تم تسجيل حركة ${sanitizedType} بنجاح`, 'success');
         UI.closeModal('stock-modal');
     } catch (error) {
-        console.error("Transaction Error: ", error);
-        UI.showToast('حدث خطأ أثناء تسجيل الحركة', 'error');
+        if (error.message === 'INSUFFICIENT_STOCK') {
+            UI.showToast('الكمية المطلوبة أكبر من الرصيد الفعلي المتاح (تم التحقق لحظياً)', 'error');
+        } else if (error.message === 'ITEM_NOT_FOUND') {
+            UI.showToast('الصنف غير موجود أو تم حذفه', 'error');
+        } else {
+            console.error("Transaction Error: ", error);
+            UI.showToast('حدث خطأ أثناء تسجيل الحركة', 'error');
+        }
     }
 }
 
@@ -389,85 +420,129 @@ export async function processTransferTransaction(sourceItemId, sourceWhId, sourc
         UI.showToast('الكمية يجب أن تكون أكبر من الصفر', 'error');
         return;
     }
+
+    // Optimistic pre-check (will be RE-validated inside transaction)
     if (baseQty > sourceItem.currentStock) {
         UI.showToast('الكمية المطلوبة للنقل أكبر من الرصيد المتاح', 'error');
         return;
     }
 
-    // Find equivalent item in destination
-    let destItem = AppState.items.find(i => i.whId === destWhId && i.secId === destSecId && i.name === sourceItem.name);
-    
+    // Find equivalent item in destination (from live AppState, kept current by onSnapshot)
+    const destItem = AppState.items.find(i => i.whId === destWhId && i.secId === destSecId && i.name === sourceItem.name);
+
     try {
-        const batch = writeBatch(db);
-        
         const sourceRef = doc(db, 'items', sourceItemId);
-        batch.update(sourceRef, {
-            currentStock: increment(-baseQty),
-            updatedAt: serverTimestamp()
-        });
-        
-        const sourceLogRef = doc(collection(db, `items/${sourceItemId}/historyLog`));
-        batch.set(sourceLogRef, {
-            type: 'صادر',
-            quantity: baseQty,
-            balanceAfter: sourceItem.currentStock - baseQty,
-            date: serverTimestamp(),
-            note: `نقل إلى مستودع/قسم آخر`,
-            empCode: AppState.userLoginId || ''
-        });
 
-        if (destItem) {
-            // Update existing destination item
-            const destRef = doc(db, 'items', destItem.id);
-            batch.update(destRef, {
-                currentStock: increment(baseQty),
+        // ══ FIRESTORE TRANSACTION: Protects source stock from Race Conditions ══
+        await runTransaction(db, async (transaction) => {
+            // Step 1: Read source item with LIVE data inside transaction lock
+            const sourceSnap = await transaction.get(sourceRef);
+            if (!sourceSnap.exists()) {
+                throw new Error('SOURCE_NOT_FOUND');
+            }
+
+            const liveSourceData = sourceSnap.data();
+            const liveSourceStock = liveSourceData.currentStock || 0;
+
+            // Step 2: Re-validate source stock with LIVE data (race-condition proof)
+            if (baseQty > liveSourceStock) {
+                throw new Error('INSUFFICIENT_STOCK');
+            }
+
+            const newSourceBalance = liveSourceStock - baseQty;
+
+            // Step 3: Deduct from source (exact value from live read)
+            transaction.update(sourceRef, {
+                currentStock: newSourceBalance,
                 updatedAt: serverTimestamp()
             });
-            const destLogRef = doc(collection(db, `items/${destItem.id}/historyLog`));
-            batch.set(destLogRef, {
-                type: 'وارد',
-                quantity: baseQty,
-                balanceAfter: destItem.currentStock + baseQty,
-                date: serverTimestamp(),
-                note: `نقل من ${sourceItem.whName} / ${sourceItem.secName}`,
-                empCode: AppState.userLoginId || ''
-            });
-        } else {
-            // Create new item in destination
-            const newDestRef = doc(collection(db, 'items'));
-            const destWh = AppState.warehouses.find(w => w.id === destWhId);
-            const destSec = AppState.sections.find(s => s.id === destSecId);
-            
-            batch.set(newDestRef, {
-                whId: destWh.id,
-                whName: destWh.name,
-                secId: destSec.id,
-                secName: destSec.name,
-                name: sourceItem.name,
-                unitType: sourceItem.unitType,
-                cartonCapacity: sourceItem.cartonCapacity,
-                minStockLevel: sourceItem.minStockLevel,
-                currentStock: baseQty,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
-            
-            const destLogRef = doc(collection(db, `items/${newDestRef.id}/historyLog`));
-            batch.set(destLogRef, {
-                type: 'وارد',
-                quantity: baseQty,
-                balanceAfter: baseQty,
-                date: serverTimestamp(),
-                note: `نقل من ${sourceItem.whName} / ${sourceItem.secName}`,
-                empCode: AppState.userLoginId || ''
-            });
-        }
 
-        await batch.commit();
+            // Step 4: Log source history (accurate balanceAfter)
+            const sourceLogRef = doc(collection(db, `items/${sourceItemId}/historyLog`));
+            transaction.set(sourceLogRef, {
+                type: 'صادر',
+                quantity: baseQty,
+                balanceAfter: newSourceBalance,
+                date: serverTimestamp(),
+                note: 'نقل إلى مستودع/قسم آخر',
+                empCode: AppState.userLoginId || ''
+            });
+
+            // Step 5: Handle destination
+            if (destItem) {
+                const destRef = doc(db, 'items', destItem.id);
+                const destSnap = await transaction.get(destRef);
+
+                let newDestBalance = baseQty;
+                if (destSnap.exists()) {
+                    const liveDestData = destSnap.data();
+                    newDestBalance = (liveDestData.currentStock || 0) + baseQty;
+                    transaction.update(destRef, {
+                        currentStock: newDestBalance,
+                        updatedAt: serverTimestamp()
+                    });
+                } else {
+                    // Dest was deleted between pre-check and transaction — recreate
+                    const destWh = AppState.warehouses.find(w => w.id === destWhId);
+                    const destSec = AppState.sections.find(s => s.id === destSecId);
+                    transaction.set(destRef, {
+                        whId: destWh.id, whName: destWh.name,
+                        secId: destSec.id, secName: destSec.name,
+                        name: sourceItem.name, unitType: sourceItem.unitType,
+                        cartonCapacity: sourceItem.cartonCapacity,
+                        minStockLevel: sourceItem.minStockLevel,
+                        currentStock: baseQty,
+                        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+                    });
+                }
+
+                const destLogRef = doc(collection(db, `items/${destItem.id}/historyLog`));
+                transaction.set(destLogRef, {
+                    type: 'وارد',
+                    quantity: baseQty,
+                    balanceAfter: newDestBalance,
+                    date: serverTimestamp(),
+                    note: `نقل من ${liveSourceData.whName || sourceItem.whName} / ${liveSourceData.secName || sourceItem.secName}`,
+                    empCode: AppState.userLoginId || ''
+                });
+            } else {
+                // No existing destination item — create new one
+                const newDestRef = doc(collection(db, 'items'));
+                const destWh = AppState.warehouses.find(w => w.id === destWhId);
+                const destSec = AppState.sections.find(s => s.id === destSecId);
+
+                transaction.set(newDestRef, {
+                    whId: destWh.id, whName: destWh.name,
+                    secId: destSec.id, secName: destSec.name,
+                    name: sourceItem.name, unitType: sourceItem.unitType,
+                    cartonCapacity: sourceItem.cartonCapacity,
+                    minStockLevel: sourceItem.minStockLevel,
+                    currentStock: baseQty,
+                    createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+                });
+
+                const destLogRef = doc(collection(db, `items/${newDestRef.id}/historyLog`));
+                transaction.set(destLogRef, {
+                    type: 'وارد',
+                    quantity: baseQty,
+                    balanceAfter: baseQty,
+                    date: serverTimestamp(),
+                    note: `نقل من ${liveSourceData.whName || sourceItem.whName} / ${liveSourceData.secName || sourceItem.secName}`,
+                    empCode: AppState.userLoginId || ''
+                });
+            }
+        });
+
         UI.showToast('تم النقل بنجاح', 'success');
         UI.closeModal('transfer-modal');
     } catch (error) {
-        console.error("Transfer Error: ", error);
-        UI.showToast('حدث خطأ أثناء نقل المخزون', 'error');
+        if (error.message === 'INSUFFICIENT_STOCK') {
+            UI.showToast('الكمية المطلوبة للنقل أكبر من الرصيد الفعلي المتاح (تم التحقق لحظياً)', 'error');
+        } else if (error.message === 'SOURCE_NOT_FOUND') {
+            UI.showToast('الصنف المصدر غير موجود أو تم حذفه', 'error');
+        } else {
+            console.error("Transfer Error: ", error);
+            UI.showToast('حدث خطأ أثناء نقل المخزون', 'error');
+        }
     }
 }
