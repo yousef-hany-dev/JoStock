@@ -432,32 +432,44 @@ export async function processTransferTransaction(sourceItemId, sourceWhId, sourc
 
     try {
         const sourceRef = doc(db, 'items', sourceItemId);
+        const destRef = destItem ? doc(db, 'items', destItem.id) : null;
 
-        // ══ FIRESTORE TRANSACTION: Protects source stock from Race Conditions ══
+        // ══ FIRESTORE TRANSACTION: All READS first, then all WRITES ══
+        // Firestore rule: transaction.get() calls MUST come before any
+        // transaction.update()/set() calls, otherwise it throws:
+        // "Firestore transactions require all reads to be executed before all writes"
         await runTransaction(db, async (transaction) => {
-            // Step 1: Read source item with LIVE data inside transaction lock
+
+            // ────────────── PHASE 1: ALL READS ──────────────
             const sourceSnap = await transaction.get(sourceRef);
             if (!sourceSnap.exists()) {
                 throw new Error('SOURCE_NOT_FOUND');
             }
 
+            let destSnap = null;
+            if (destRef) {
+                destSnap = await transaction.get(destRef);
+            }
+
+            // ────────────── PHASE 2: VALIDATION ──────────────
             const liveSourceData = sourceSnap.data();
             const liveSourceStock = liveSourceData.currentStock || 0;
 
-            // Step 2: Re-validate source stock with LIVE data (race-condition proof)
             if (baseQty > liveSourceStock) {
                 throw new Error('INSUFFICIENT_STOCK');
             }
 
             const newSourceBalance = liveSourceStock - baseQty;
 
-            // Step 3: Deduct from source (exact value from live read)
+            // ────────────── PHASE 3: ALL WRITES ──────────────
+
+            // Write 1: Deduct from source
             transaction.update(sourceRef, {
                 currentStock: newSourceBalance,
                 updatedAt: serverTimestamp()
             });
 
-            // Step 4: Log source history (accurate balanceAfter)
+            // Write 2: Source history log
             const sourceLogRef = doc(collection(db, `items/${sourceItemId}/historyLog`));
             transaction.set(sourceLogRef, {
                 type: 'صادر',
@@ -468,39 +480,44 @@ export async function processTransferTransaction(sourceItemId, sourceWhId, sourc
                 empCode: AppState.userLoginId || ''
             });
 
-            // Step 5: Handle destination
-            if (destItem) {
-                const destRef = doc(db, 'items', destItem.id);
-                const destSnap = await transaction.get(destRef);
-
-                let newDestBalance = baseQty;
-                if (destSnap.exists()) {
-                    const liveDestData = destSnap.data();
-                    newDestBalance = (liveDestData.currentStock || 0) + baseQty;
-                    transaction.update(destRef, {
-                        currentStock: newDestBalance,
-                        updatedAt: serverTimestamp()
-                    });
-                } else {
-                    // Dest was deleted between pre-check and transaction — recreate
-                    const destWh = AppState.warehouses.find(w => w.id === destWhId);
-                    const destSec = AppState.sections.find(s => s.id === destSecId);
-                    transaction.set(destRef, {
-                        whId: destWh.id, whName: destWh.name,
-                        secId: destSec.id, secName: destSec.name,
-                        name: sourceItem.name, unitType: sourceItem.unitType,
-                        cartonCapacity: sourceItem.cartonCapacity,
-                        minStockLevel: sourceItem.minStockLevel,
-                        currentStock: baseQty,
-                        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-                    });
-                }
+            // Write 3 & 4: Destination item + history log
+            if (destRef && destSnap && destSnap.exists()) {
+                // Destination item exists — update it
+                const liveDestData = destSnap.data();
+                const newDestBalance = (liveDestData.currentStock || 0) + baseQty;
+                transaction.update(destRef, {
+                    currentStock: newDestBalance,
+                    updatedAt: serverTimestamp()
+                });
 
                 const destLogRef = doc(collection(db, `items/${destItem.id}/historyLog`));
                 transaction.set(destLogRef, {
                     type: 'وارد',
                     quantity: baseQty,
                     balanceAfter: newDestBalance,
+                    date: serverTimestamp(),
+                    note: `نقل من ${liveSourceData.whName || sourceItem.whName} / ${liveSourceData.secName || sourceItem.secName}`,
+                    empCode: AppState.userLoginId || ''
+                });
+            } else if (destRef && destSnap && !destSnap.exists()) {
+                // Dest was deleted between pre-check and transaction — recreate
+                const destWh = AppState.warehouses.find(w => w.id === destWhId);
+                const destSec = AppState.sections.find(s => s.id === destSecId);
+                transaction.set(destRef, {
+                    whId: destWh.id, whName: destWh.name,
+                    secId: destSec.id, secName: destSec.name,
+                    name: sourceItem.name, unitType: sourceItem.unitType,
+                    cartonCapacity: sourceItem.cartonCapacity,
+                    minStockLevel: sourceItem.minStockLevel,
+                    currentStock: baseQty,
+                    createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+                });
+
+                const destLogRef = doc(collection(db, `items/${destItem.id}/historyLog`));
+                transaction.set(destLogRef, {
+                    type: 'وارد',
+                    quantity: baseQty,
+                    balanceAfter: baseQty,
                     date: serverTimestamp(),
                     note: `نقل من ${liveSourceData.whName || sourceItem.whName} / ${liveSourceData.secName || sourceItem.secName}`,
                     empCode: AppState.userLoginId || ''
